@@ -66,7 +66,7 @@ add_executable(simulation
     src/util/command_line_parser.cc
 )
 
-target_compile_features(simulation PUBLIC cxx_std_14)
+target_compile_features(simulation PUBLIC cxx_std_17)
 target_compile_options(simulation PUBLIC -Wno-missing-braces
                                          -pthread
                                          -fPIC)
