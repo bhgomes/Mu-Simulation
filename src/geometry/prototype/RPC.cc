@@ -21,6 +21,18 @@
 
 namespace MATHUSLA { namespace MU {
 
+namespace {
+
+constexpr auto temperature = 298.15*kelvin;
+
+constexpr auto atlas_gas_fraction = 0.85;
+
+constexpr auto atlas_gas_c2h2f4_fraction    = 0.952;
+constexpr auto atlas_gas_isobutane_fraction = 0.045;
+constexpr auto atlas_gas_sf6_fraction       = 0.003;
+
+}
+
 namespace Prototype { //////////////////////////////////////////////////////////////////////////
 
 //__RPC Info____________________________________________________________________________________
@@ -46,17 +58,60 @@ RPC::Pad::Pad(int input_id) : id(input_id) {}
 
 //__RPC Constructor_____________________________________________________________________________
 RPC::RPC(int input_id) : _pads(), _id(input_id), _name("RPC" + std::to_string(1 + input_id)) {
-  _volume = Construction::BoxVolume(_name, Width, Height, Depth, Material::Casing);
+  _volume = Construction::BoxVolume(_name, Width, Height, Depth, Construction::Material::Air, Construction::BorderAttributes());
 
   const auto id_name = (_id < 9 ? "0" : "") + std::to_string(1 + _id);
+
+  auto aluminum_sheet = Construction::BoxVolume(_name + "_Aluminum", Width, Height, AluminumDepth, Construction::Material::Aluminum, Construction::CasingAttributes());
+  auto bakelite_sheet = Construction::BoxVolume(_name + "_Bakelite", Width, Height, BakeliteDepth, Construction::Material::Bakelite);
+  auto copper_strips = Construction::BoxVolume(_name + "_Copper", Width, Height, CopperDepth, Construction::Material::Copper);
+  auto thick_foam_layer = Construction::BoxVolume(_name + "_ThickFoam", Width, Height, ThickFoamDepth, Construction::Material::PolystyreneFoam);
+  auto thin_foam_layer = Construction::BoxVolume(_name + "_ThinFoam", Width, Height, ThinFoamDepth, Construction::Material::PolystyreneFoam);
+  auto thick_pet_film = Construction::BoxVolume(_name + "_ThickPET", Width, Height, ThickPETDepth, Material::PET);
+  auto medium_pet_film = Construction::BoxVolume(_name + "_MediumPET", Width, Height, MediumPETDepth, Material::PET);
+  auto thin_pet_film = Construction::BoxVolume(_name + "_ThinPET", Width, Height, ThinPETDepth, Material::PET);
+
+  auto z_shift = -(StripDepth + BakeliteDepth) / 2.0;
+  Construction::PlaceVolume(bakelite_sheet, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift -= (BakeliteDepth + CopperDepth) / 2.0;
+  Construction::PlaceVolume(copper_strips, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift -= (CopperDepth + MediumPETDepth) / 2.0;
+  Construction::PlaceVolume(medium_pet_film, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift -= (MediumPETDepth + ThinFoamDepth) / 2.0;
+  Construction::PlaceVolume(thin_foam_layer, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift -= (ThinFoamDepth + ThinPETDepth) / 2.0;
+  Construction::PlaceVolume(thin_pet_film, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift -= (ThinPETDepth + CopperDepth) / 2.0;
+  Construction::PlaceVolume(copper_strips, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift -= (CopperDepth + AluminumDepth) / 2.0;
+  Construction::PlaceVolume(aluminum_sheet, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift -= (AluminumDepth + ThickFoamDepth) / 2.0;
+  Construction::PlaceVolume(thick_foam_layer, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift -= (ThickFoamDepth + AluminumDepth) / 2.0;
+  Construction::PlaceVolume(aluminum_sheet, _volume, G4Translate3D(0.0, 0.0, z_shift));
+
+  z_shift = (StripDepth + BakeliteDepth) / 2.0;
+  Construction::PlaceVolume(bakelite_sheet, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift += (BakeliteDepth + ThickPETDepth) / 2.0;
+  Construction::PlaceVolume(thick_pet_film, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift += (ThickPETDepth + ThinFoamDepth) / 2.0;
+  Construction::PlaceVolume(thin_foam_layer, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift += (ThinFoamDepth + CopperDepth) / 2.0;
+  Construction::PlaceVolume(copper_strips, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift += (CopperDepth + MediumPETDepth) / 2.0;
+  Construction::PlaceVolume(medium_pet_film, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift += (MediumPETDepth + AluminumDepth) / 2.0;
+  Construction::PlaceVolume(aluminum_sheet, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift += (AluminumDepth + ThickFoamDepth) / 2.0;
+  Construction::PlaceVolume(thick_foam_layer, _volume, G4Translate3D(0.0, 0.0, z_shift));
+  z_shift += (ThickFoamDepth + AluminumDepth) / 2.0;
+  Construction::PlaceVolume(aluminum_sheet, _volume, G4Translate3D(0.0, 0.0, z_shift));
 
   for (std::size_t pad_index{}; pad_index < PadsPerRPC; ++pad_index) {
     auto pad = new Pad(pad_index);
 
-    pad->lvolume = Construction::BoxVolume(
-      "PAD" + std::to_string(1 + pad_index),
-      PadWidth, PadHeight, PadDepth,
-      Material::Pad, Construction::CasingAttributes());
+    pad->lvolume = Construction::BoxVolume("PAD" + std::to_string(1 + pad_index),
+                                           PadWidth, PadHeight, PadDepth);
 
     const auto pad_name = id_name + (pad_index < 9 ? "0" : "") + std::to_string(1 + pad_index);
 
@@ -84,38 +139,46 @@ RPC::RPC(int input_id) : _pads(), _id(input_id), _name("RPC" + std::to_string(1 
 //----------------------------------------------------------------------------------------------
 
 //__RPC Material________________________________________________________________________________
-G4Material* RPC::Material::Casing = nullptr;
-G4Material* RPC::Material::Pad    = nullptr;
-G4Material* RPC::Material::Gas    = nullptr;
+G4Material* RPC::Material::Gas = nullptr;
+G4Material* RPC::Material::PET = nullptr;
 //----------------------------------------------------------------------------------------------
 
 //__Define RPC Material_________________________________________________________________________
 void RPC::Material::Define() {
-  Material::Casing = Construction::Material::Aluminum;
-  Material::Pad    = Construction::Material::Air;
-
-  auto C2H2F4 = new G4Material("C2H2F4", 4.1684*g/L, 3);
+  auto C2H2F4 = new G4Material("C2H2F4", 4.1684*g/L, 3, G4State::kStateGas, temperature);
   C2H2F4->AddElement(Construction::Material::C, 2);
   C2H2F4->AddElement(Construction::Material::H, 2);
   C2H2F4->AddElement(Construction::Material::F, 4);
 
-  /* NOTE: In case it becomes necessary:
+  auto isobutane = new G4Material("Isobutane", 2.4403*g/L, 2, G4State::kStateGas, temperature);
+  isobutane->AddElement(Construction::Material::C, 4);
+  isobutane->AddElement(Construction::Material::H, 10);
 
-  auto iso_C4H10 = new G4Material("iso-C4H10", 0*g/L, 2);
-  iso_C4H10->AddElement(Construction::Material::C, 4);
-  iso_C4H10->AddElement(Construction::Material::H, 10);
-
-  auto SF6 = new G4Material("SF6", 0*g/L, 2);
+  auto SF6 = new G4Material("SF6", 6.0380*g/L, 2, G4State::kStateGas, temperature);
   SF6->AddElement(Construction::Material::S, 1);
   SF6->AddElement(Construction::Material::F, 6);
-  */
 
-  auto argon = new G4Material("Argon", 1.635*g/L, 1);
+  auto argon = new G4Material("Argon", 1.6339*g/L, 1, G4State::kStateGas, temperature);
   argon->AddElement(Construction::Material::Ar, 1);
 
-  Material::Gas = new G4Material("Gas", 3.773*g/L, 2, G4State::kStateGas);
-  Material::Gas->AddMaterial(C2H2F4, 0.93);
-  Material::Gas->AddMaterial(argon,  0.07);
+  const auto c2h2f4_partial_density    = atlas_gas_fraction * atlas_gas_c2h2f4_fraction    * C2H2F4->GetDensity();
+  const auto isobutane_partial_density = atlas_gas_fraction * atlas_gas_isobutane_fraction * isobutane->GetDensity();
+  const auto sf6_partial_density       = atlas_gas_fraction * atlas_gas_sf6_fraction       * SF6->GetDensity();
+
+  const auto argon_partial_density     = (1.0 - atlas_gas_fraction) * argon->GetDensity();
+
+  const auto gas_density = c2h2f4_partial_density + isobutane_partial_density + sf6_partial_density + argon_partial_density;
+
+  Material::Gas = new G4Material("Gas", gas_density, 4, G4State::kStateGas, temperature);
+  Material::Gas->AddMaterial(C2H2F4,    c2h2f4_partial_density    / gas_density);
+  Material::Gas->AddMaterial(isobutane, isobutane_partial_density / gas_density);
+  Material::Gas->AddMaterial(SF6,       sf6_partial_density       / gas_density);
+  Material::Gas->AddMaterial(argon,     argon_partial_density     / gas_density);
+
+  Material::PET = new G4Material("PET", 1.397*g/cm3, 3, G4State::kStateSolid);
+  Material::PET->AddElement(Construction::Material::C, 10);
+  Material::PET->AddElement(Construction::Material::H, 8);
+  Material::PET->AddElement(Construction::Material::O, 4);
 }
 //----------------------------------------------------------------------------------------------
 
